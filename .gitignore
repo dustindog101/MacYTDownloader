@@ -1,0 +1,25 @@
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Icon files
+Icon\r
+
+# Files that might be created by other developer tools
+.DocumentRevisions-V100
+.LSOverride
+.VolumeIcon.icns
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.apdisk
+.com.apple.timemachine.donotpresent
+
+# Compiles / Build directories
+build/
+*.app
+*.dmg
+*.o
+*.out
