@@ -41,7 +41,7 @@ public class UpdateManager: NSObject, ObservableObject {
     @Published public var showUpdateSheet = false
     @Published public var showReleaseNotesSheet = false
     
-    public let currentVersion = "1.0.1"
+    public let currentVersion = "1.0.2"
     public let repoPath = "dustindog101/MacYTDownloader"
     
     private var downloadTask: URLSessionDownloadTask?
