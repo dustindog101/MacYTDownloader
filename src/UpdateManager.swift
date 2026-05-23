@@ -41,7 +41,7 @@ public class UpdateManager: NSObject, ObservableObject {
     @Published public var showUpdateSheet = false
     @Published public var showReleaseNotesSheet = false
     
-    public let currentVersion = "1.0.0"
+    public let currentVersion = "1.0.1"
     public let repoPath = "dustindog101/MacYTDownloader"
     
     private var downloadTask: URLSessionDownloadTask?
@@ -177,24 +177,96 @@ public class UpdateManager: NSObject, ObservableObject {
     
     private func installDMG(at localUrl: URL) {
         DispatchQueue.main.async {
-            self.downloadStatus = "Opening installer..."
+            self.downloadStatus = "Mounting update..."
         }
         
-        NSWorkspace.shared.open(localUrl)
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+        process.arguments = ["attach", "-nobrowse", "-readonly", localUrl.path]
         
-        DispatchQueue.main.async {
-            self.isDownloading = false
-            self.downloadStatus = ""
-            self.downloadProgress = 0.0
-            self.updateAvailable = false
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+        
+        process.terminationHandler = { [weak self] proc in
+            guard let self = self else { return }
             
-            let alert = NSAlert()
-            alert.messageText = "Installer Mounted Successfully"
-            alert.informativeText = "The MacYT Downloader update disk image has been mounted. Please close this app, drag the new version into Applications to replace it, and reopen!"
-            alert.addButton(withTitle: "Quit and Install")
-            alert.addButton(withTitle: "Later")
-            if alert.runModal() == .alertFirstButtonReturn {
-                NSApplication.shared.terminate(nil)
+            guard proc.terminationStatus == 0 else {
+                DispatchQueue.main.async {
+                    self.isDownloading = false
+                    self.downloadStatus = "Failed to mount update installer."
+                }
+                return
+            }
+            
+            // Find the mounted volume path
+            let mountPath = "/Volumes/MacYT Downloader"
+            let sourceAppPath = "\(mountPath)/MacYTDownloader.app"
+            let targetAppPath = Bundle.main.bundlePath
+            let parentPid = ProcessInfo.processInfo.processIdentifier
+            
+            guard FileManager.default.fileExists(atPath: sourceAppPath) else {
+                DispatchQueue.main.async {
+                    self.isDownloading = false
+                    self.downloadStatus = "Update files missing inside mounted image."
+                }
+                // Cleanup and force unmount
+                let detachProc = Process()
+                detachProc.executableURL = URL(fileURLWithPath: "/usr/bin/hdiutil")
+                detachProc.arguments = ["detach", mountPath, "-force"]
+                try? detachProc.run()
+                return
+            }
+            
+            // Spawns a background script that waits for parent to exit, copies the new bundle, detaches image, and relaunch.
+            let script = """
+            (
+                # Wait for parent app to fully terminate
+                while kill -0 \(parentPid) 2>/dev/null; do
+                    sleep 0.1
+                done
+                
+                # Delete existing bundle and copy the new one
+                rm -rf "\(targetAppPath)"
+                cp -R "\(sourceAppPath)" "\(targetAppPath)"
+                
+                # Unmount and clean up mounted disk volume
+                hdiutil detach "\(mountPath)" -force
+                
+                # Open the new updated application
+                open "\(targetAppPath)"
+            ) &
+            """
+            
+            let updaterProcess = Process()
+            updaterProcess.executableURL = URL(fileURLWithPath: "/bin/zsh")
+            updaterProcess.arguments = ["-c", script]
+            
+            do {
+                try updaterProcess.run()
+                
+                DispatchQueue.main.async {
+                    self.isDownloading = false
+                    self.downloadStatus = ""
+                    self.updateAvailable = false
+                    
+                    // Terminate parent app to let the background installer execute replacement and relaunch!
+                    NSApplication.shared.terminate(nil)
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.isDownloading = false
+                    self.downloadStatus = "Failed to run background update installer: \(error.localizedDescription)"
+                }
+            }
+        }
+        
+        do {
+            try process.run()
+        } catch {
+            DispatchQueue.main.async {
+                self.isDownloading = false
+                self.downloadStatus = "Execution error mounting update: \(error.localizedDescription)"
             }
         }
     }

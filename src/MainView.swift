@@ -574,7 +574,7 @@ struct MainView: View {
                             .font(.system(.subheadline, design: .rounded))
                             .fontWeight(.bold)
                         
-                        Text(release.body)
+                        Text(release.body.replacingOccurrences(of: "\\n", with: "\n"))
                             .font(.system(.body, design: .rounded))
                             .foregroundColor(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -669,7 +669,7 @@ struct MainView: View {
                             .fontWeight(.bold)
                             .foregroundColor(.primary)
                         
-                        Text(release.body)
+                        Text(release.body.replacingOccurrences(of: "\\n", with: "\n"))
                             .font(.system(.body, design: .rounded))
                             .foregroundColor(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
