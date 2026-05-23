@@ -64,7 +64,6 @@ struct MainView: View {
     @State private var selectedFormat = "MP4"
     @State private var selectedQuality = "Balanced"
     @State private var isSearchFocused = false
-    @State private var showUpdateSheet = false
     
     let formats = ["MP4", "MP4 (No Audio)", "MP3", "FLAC", "WAV", "Opus", "M4A"]
     let db = HistoryDatabase()
@@ -117,12 +116,15 @@ struct MainView: View {
             updateManager.checkForUpdates()
         }
         .frame(minWidth: 800, minHeight: 540)
-        .sheet(isPresented: $showUpdateSheet) {
+        .sheet(isPresented: $updateManager.showUpdateSheet) {
             updateModalSheet
+        }
+        .sheet(isPresented: $updateManager.showReleaseNotesSheet) {
+            releaseNotesModalSheet
         }
         .onChange(of: updateManager.updateAvailable) { newValue in
             if newValue {
-                showUpdateSheet = true
+                updateManager.showUpdateSheet = true
             }
         }
     }
@@ -611,7 +613,7 @@ struct MainView: View {
                     Spacer()
                     
                     Button("Skip Version") {
-                        showUpdateSheet = false
+                        updateManager.showUpdateSheet = false
                         updateManager.updateAvailable = false
                     }
                     .buttonStyle(.bordered)
@@ -631,6 +633,75 @@ struct MainView: View {
         }
         .padding(24)
         .frame(width: 460, height: 320)
+        .background(.ultraThinMaterial)
+    }
+    
+    // High-definition Release Notes Modal Sheet (Premium macOS 26 UX)
+    private var releaseNotesModalSheet: some View {
+        VStack(spacing: 16) {
+            HStack(spacing: 12) {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.system(size: 34))
+                    .foregroundColor(.purple)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Release Notes")
+                        .font(.system(.title3, design: .rounded))
+                        .fontWeight(.black)
+                    
+                    if let release = updateManager.latestRelease {
+                        Text("Version \(release.tagName) Details")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                Spacer()
+            }
+            .padding(.top, 8)
+            
+            Divider()
+            
+            if let release = updateManager.latestRelease {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("What's New in this Version:")
+                            .font(.system(.subheadline, design: .rounded))
+                            .fontWeight(.bold)
+                            .foregroundColor(.primary)
+                        
+                        Text(release.body)
+                            .font(.system(.body, design: .rounded))
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(14)
+                .background(Color.secondary.opacity(0.04))
+                .cornerRadius(12)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+            } else {
+                Text("No release notes found.")
+                    .font(.system(.body, design: .rounded))
+                    .foregroundColor(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            
+            Spacer()
+            
+            HStack {
+                Spacer()
+                Button("Done") {
+                    updateManager.showReleaseNotesSheet = false
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+            }
+        }
+        .padding(24)
+        .frame(width: 480, height: 350)
         .background(.ultraThinMaterial)
     }
     

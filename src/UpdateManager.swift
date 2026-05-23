@@ -35,6 +35,12 @@ public class UpdateManager: NSObject, ObservableObject {
     @Published public var latestRelease: GitHubRelease?
     @Published public var updateAvailable = false
     
+    // New states for premium UX update flow
+    @Published public var hasChecked = false
+    @Published public var updateError: String? = nil
+    @Published public var showUpdateSheet = false
+    @Published public var showReleaseNotesSheet = false
+    
     public let currentVersion = "1.0.0"
     public let repoPath = "dustindog101/MacYTDownloader"
     
@@ -49,11 +55,15 @@ public class UpdateManager: NSObject, ObservableObject {
         
         DispatchQueue.main.async {
             self.isChecking = true
+            self.updateError = nil
         }
         
         let urlString = "https://api.github.com/repos/\(repoPath)/releases/latest"
         guard let url = URL(string: urlString) else {
-            DispatchQueue.main.async { self.isChecking = false }
+            DispatchQueue.main.async {
+                self.isChecking = false
+                self.updateError = "Invalid update server address."
+            }
             completion?(false)
             return
         }
@@ -66,9 +76,21 @@ public class UpdateManager: NSObject, ObservableObject {
             
             DispatchQueue.main.async {
                 self.isChecking = false
+                self.hasChecked = true
             }
             
-            guard let data = data, error == nil else {
+            if let error = error {
+                DispatchQueue.main.async {
+                    self.updateError = error.localizedDescription
+                }
+                completion?(false)
+                return
+            }
+            
+            guard let data = data else {
+                DispatchQueue.main.async {
+                    self.updateError = "No response from updates server."
+                }
                 completion?(false)
                 return
             }
@@ -82,9 +104,10 @@ public class UpdateManager: NSObject, ObservableObject {
                 let isNewer = self.isVersion(cleanLatest, newerThan: cleanCurrent)
                 
                 DispatchQueue.main.async {
+                    self.latestRelease = release
                     if isNewer {
-                        self.latestRelease = release
                         self.updateAvailable = true
+                        self.showUpdateSheet = true // Automatically pop up details and download dialog
                         completion?(true)
                     } else {
                         self.updateAvailable = false
@@ -93,6 +116,9 @@ public class UpdateManager: NSObject, ObservableObject {
                 }
             } catch {
                 print("Error parsing release JSON: \(error)")
+                DispatchQueue.main.async {
+                    self.updateError = "Failed to parse release notes metadata."
+                }
                 completion?(false)
             }
         }.resume()

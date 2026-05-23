@@ -2,6 +2,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var settingsManager: SettingsManager
+    @ObservedObject var updateManager = UpdateManager.shared
     @State private var isUpdating = false
     @State private var updateStatus = ""
     
@@ -60,7 +61,89 @@ struct SettingsView: View {
                     
                     Divider()
                     
-                    // Section 3: Package Updates
+                    // Section 3: Application Software Updates
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("MacYT Downloader Software Updates")
+                            .font(.system(.headline, design: .rounded))
+                            .fontWeight(.semibold)
+                        
+                        HStack(spacing: 12) {
+                            Button(action: {
+                                updateManager.checkForUpdates(manual: true)
+                            }) {
+                                HStack {
+                                    if updateManager.isChecking {
+                                        ProgressView()
+                                            .scaleEffect(0.5)
+                                            .frame(width: 14, height: 14)
+                                    } else {
+                                        Image(systemName: "arrow.clockwise.circle")
+                                    }
+                                    
+                                    if updateManager.isChecking {
+                                        Text("Checking...")
+                                    } else if updateManager.hasChecked && !updateManager.updateAvailable && updateManager.updateError == nil {
+                                        Text("Up to Date")
+                                    } else {
+                                        Text("Check for Updates")
+                                    }
+                                }
+                            }
+                            .disabled(updateManager.isChecking || updateManager.isDownloading)
+                            .buttonStyle(.borderedProminent)
+                            
+                            if updateManager.isChecking {
+                                Text("Checking for new releases...")
+                                    .font(.system(.subheadline, design: .rounded))
+                                    .foregroundColor(.secondary)
+                            } else if let err = updateManager.updateError {
+                                Text("Check failed: \(err)")
+                                    .font(.system(.subheadline, design: .rounded))
+                                    .foregroundColor(.red)
+                            } else if updateManager.hasChecked {
+                                if updateManager.updateAvailable {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "arrow.up.right.circle.fill")
+                                            .foregroundColor(.green)
+                                        Text("v\(updateManager.latestRelease?.tagName.replacingOccurrences(of: "v", with: "") ?? "") is available!")
+                                            .font(.system(.subheadline, design: .rounded))
+                                            .foregroundColor(.green)
+                                            .fontWeight(.bold)
+                                        
+                                        Button("View Update Details") {
+                                            updateManager.showUpdateSheet = true
+                                        }
+                                        .buttonStyle(.link)
+                                        .font(.system(.subheadline, design: .rounded))
+                                    }
+                                } else {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "checkmark.seal.fill")
+                                            .foregroundColor(.accentColor)
+                                        Text("You are on the latest version! (v\(updateManager.currentVersion))")
+                                            .font(.system(.subheadline, design: .rounded))
+                                            .foregroundColor(.secondary)
+                                        
+                                        if updateManager.latestRelease != nil {
+                                            Button("View Release Notes") {
+                                                updateManager.showReleaseNotesSheet = true
+                                            }
+                                            .buttonStyle(.link)
+                                            .font(.system(.subheadline, design: .rounded))
+                                        }
+                                    }
+                                }
+                            } else {
+                                Text("Current Version: v\(updateManager.currentVersion)")
+                                    .font(.system(.subheadline, design: .rounded))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    // Section 4: Package Updates
                     VStack(alignment: .leading, spacing: 8) {
                         Text("yt-dlp Downloader Updater")
                             .font(.system(.headline, design: .rounded))
